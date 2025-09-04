@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Montana Chat — Sheety Integrated (URL Diperbaiki)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b141a; --header:#202c33; --accent:#075e54; --user:#dcf8c6; --bot:#2a3942; --muted:#aebac1;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial;background:var(--bg);color:#e9edef}
+  .frame{height:100vh;display:flex;align-items:center;justify-content:center;padding:12px}
+  .phone {
+    width:100%;
+    max-width:420px;
+    height:92vh;
+    background:linear-gradient(#0c1a1e,#071014);
+    border-radius:12px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.6);
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+  }
+  .header{height:62px;background:var(--header);display:flex;align-items:center;padding:10px 12px;gap:12px}
+  .avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.04)}
+  .meta{flex:1}
+  .meta .name{font-weight:600;font-size:16px}
+  .meta .sub{font-size:12px;color:var(--muted)}
+  .banner{padding:8px 14px;text-align:center;color:var(--muted);font-size:13px;background:transparent}
+  .chat {
+    flex: 1;
+    padding: 14px;
+    overflow: auto;
+    background-color: #121212;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .msg-row{display:flex;flex-direction:column;max-width:78%}
+  .msg-row.user{align-self:flex-end;align-items:flex-end}
+  .msg-row.bot{align-self:flex-start;align-items:flex-start}
+  .bubble{
+    padding:10px 14px;border-radius:14px;box-shadow:0 1px 0 rgba(0,0,0,0.3);line-height:1.35;font-size:14px;
+    position:relative;white-space:pre-wrap;word-break:break-word;max-width:100%;
+  }
+  .bubble.user{background:var(--user);color:#000;border-bottom-right-radius:4px;}
+  .bubble.bot{background:var(--bot);color:#e9edef;border-bottom-left-radius:4px;}
+  .bubble a {color: #58a6ff;}
+  .ts{font-size:11px;color:var(--muted);margin-top:6px}
+  .composer{display:flex;gap:8px;align-items:center;padding:10px;background:linear-gradient(#141e22,#0f1619)}
+  .input{flex:1;display:flex;align-items:center;gap:8px}
+  .input textarea{width:100%;min-height:40px;max-height:120px;padding:10px;border-radius:22px;border:none;background:#162426;color:#fff;font-size:15px;resize:none;outline:none}
+  .send{width:44px;height:44px;border-radius:50%;background:#00a884;border:none;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .small{font-size:12px;color:var(--muted);margin-top:6px}
+  a.link{color:#00a8ff;text-decoration:underline}
+  .meta-info{font-size:12px;color:var(--muted);margin-top:6px}
+  @media (max-width:480px){
+    .phone{height:100vh;border-radius:0}
+    .chat{padding:12px}
+    .msg-row{max-width:90%}
+  }
+</style>
+</head>
+<body>
+<div class="frame">
+  <div class="phone" role="application" aria-label="Montana chat">
+    <div class="header">
+      <img class="avatar" src="https://i.pravatar.cc/150?img=5" alt="Montana">
+      <div class="meta">
+        <div class="name">Montana AI</div>
+        <div class="sub">Akun bisnis</div>
+      </div>
+    </div>
+
+    <div class="banner" id="banner">Pesan dan panggilan terenkripsi secara end-to-end.</div>
+
+    <div id="chat" class="chat" aria-live="polite"></div>
+
+    <div class="composer">
+      <div class="input">
+        <textarea id="input" placeholder="Ketik: id 5, tanaman sengon, tanggal 2025-02-05, tujuan Nursery A, atau command: stok sekarang / realisasi keluar / realisasi masuk" aria-label="Ketik pesan"></textarea>
+      </div>
+      <button class="send" id="sendBtn" title="Kirim">➤</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ========== Konfigurasi ========== */
+const GEMINI_API_KEY = 'AIzaSyALCm5suTu8rOwHckqClXE_GeaoU3qjS6U'; 
+const sheetyUrl = 'https://api.sheety.co/68250c0c0b4a18219329ec85af45d6a4/bibitSalin/sheet1';
+
+/* ========== State ========== */
+const chatEl = document.getElementById('chat');
+const inputEl = document.getElementById('input');
+const sendBtn = document.getElementById('sendBtn');
+
+let RAW_DATA = [];
+let DATA = [];
+let chatHistory = [];
+
+/* ========== Helpers ========== */
+function nowTime() {
+  return new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+function scrollBottom() {
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+function createBubble(html, who='bot') {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'msg-row ' + (who === 'user' ? 'user' : 'bot');
+  const b = document.createElement('div');
+  b.className = 'bubble ' + (who === 'user' ? 'user' : 'bot');
+  b.innerHTML = html;
+  const ts = document.createElement('div');
+  ts.className = 'ts';
+  ts.textContent = nowTime();
+  wrapper.appendChild(b);
+  wrapper.appendChild(ts);
+  chatEl.appendChild(wrapper);
+  scrollBottom();
+  const txt = (b.innerText || b.textContent || '').trim();
+  chatHistory.push({role: who, message: txt, timestamp: new Date().toISOString()});
+}
+function escapeHtml(s){
+  return String(s || '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+}
+function decodeMaybe(v){
+  if(v === null || v === undefined) return '';
+  const s = String(v);
+  if(/[+%]/.test(s)){
+    try{
+      let t = s.replace(/\+/g,' ');
+      t = decodeURIComponent(t);
+      return t;
+    }catch(e){
+      return s.replace(/%20/g,' ').replace(/%0A/g,'\n').replace(/%3A/g,':');
+    }
+  }
+  return s;
+}
+function toIntSafe(s){
+  if(s === null || s === undefined) return 0;
+  const n = parseInt(String(s).replace(/[^0-9\-]/g,''), 10);
+  return isNaN(n) ? 0 : n;
+}
+function parseDateFlexible(s){
+  if(!s) return null;
+  let str = String(s).trim();
+  str = str.replace(/\./g,'-').replace(/\//g,'-').replace(/\s+([A-Za-z]+)/g, ' $1');
+  let d = new Date(str);
+  if(!isNaN(d.getTime())) return d;
+  const m = str.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if(m){
+    const dd = parseInt(m[1],10), mm = parseInt(m[2],10)-1, yy = parseInt(m[3],10);
+    d = new Date(yy,mm,dd);
+    if(!isNaN(d.getTime())) return d;
+  }
+  const mm2 = Date.parse(str);
+  if(!isNaN(mm2)) return new Date(mm2);
+  return null;
+}
+
+/* ========== Normalize & compute running balance ========== */
+function normalizeAndCompute(rawRows){
+  const rows = rawRows.map((r, idx) => ({...r}));
+  const sample = rows[0] || {};
+  const keys = Object.keys(sample);
+  const findKey = (candidatesRegex) => {
+    for(const k of keys){
+      for(const rx of candidatesRegex){
+        if(new RegExp(rx,'i').test(k)) return k;
+      }
+    }
+    return null;
+  };
+  const dateKey = findKey(['tanggal','tgl','date','created_at','waktu']);
+  const masukKey = findKey(['jumlah masuk','masuk','qty_in','jumlah_masuk','in']);
+  const keluarKey = findKey(['jumlah keluar','keluar','qty_out','jumlah_keluar','out']);
+  const idKey = findKey(['^id$','^kode$','nota','no','nomor']);
+
+  const normalized = rows.map((r, idx) => {
+    const rawDate = dateKey ? decodeMaybe(r[dateKey]) : '';
+    const parsedDate = parseDateFlexible(rawDate);
+    const masukRaw = masukKey ? decodeMaybe(r[masukKey]) : (r['masuk'] || r['in'] || '');
+    const keluarRaw = keluarKey ? decodeMaybe(r[keluarKey]) : (r['keluar'] || r['out'] || '');
+    return {
+      __idx: idx,
+      __raw: r,
+      __dateRaw: rawDate,
+      __date: parsedDate,
+      id: idKey ? decodeMaybe(r[idKey]) : '',
+      masukRaw,
+      keluarRaw,
+      masuk: toIntSafe(masukRaw),
+      keluar: toIntSafe(keluarRaw)
+    };
+  });
+
+  const parsedCount = normalized.filter(x => x.__date instanceof Date).length;
+  if(parsedCount >= Math.max(1, Math.floor(normalized.length/2))){
+    normalized.sort((a,b) => {
+      const da = a.__date ? a.__date.getTime() : Infinity;
+      const db = b.__date ? b.__date.getTime() : Infinity;
+      if(da !== db) return da - db;
+      return a.__idx - b.__idx;
+    });
+  }
+
+  let balance = 0;
+  return normalized.map(item => {
+    balance = balance + item.masuk - item.keluar;
+    return {...item, runningBalance: balance};
+  });
+}
+
+/* ========== Format Row ========== */
+function formatRowAsChat(row){
+  const r = row.__raw || row;
+  const keyMap = {};
+  Object.keys(r || {}).forEach(k => keyMap[k.toLowerCase().trim()] = k);
+  const pick = (names) => {
+    for(const n of names){
+      const low = n.toLowerCase();
+      if(keyMap[low]) return decodeMaybe(r[keyMap[low]]);
+    }
+    return '';
+  };
+  const tanggal = row.__date ? (row.__date.toLocaleDateString('id-ID', {day: '2-digit', month: 'long', year: 'numeric'})) : (row.__dateRaw || pick(['tanggal','tgl','date']));
+  const jenis = pick(['tanaman','bibit','jenis']);
+  const masukRaw = row.masukRaw || pick(['jumlah masuk','masuk','qty_in']);
+  const keluarRaw = row.keluarRaw || pick(['jumlah keluar','keluar','qty_out']);
+  const sumber = pick(['sumber','vendor']);
+  const tujuan = pick(['tujuan','lokasi']);
+  const pengawas = pick(['pengawas']);
+  const idVal = row.id || pick(['id','nota','kode']);
+  const status = pick(['status','keterangan']);
+  const masuk = row.masuk || toIntSafe(masukRaw);
+  const keluar = row.keluar || toIntSafe(keluarRaw);
+  const running = (typeof row.runningBalance === 'number') ? row.runningBalance : (masuk - keluar);
+
+  let suggestion = '';
+  if(isNaN(running)){
+    suggestion = 'Tidak ada data stok kumulatif.';
+  } else if(running <= 0) suggestion = '⚠️ Stok habis atau negatif.';
+  else if(running <= 50) suggestion = '⚠️ Stok menipis.';
+  else if(running <= 200) suggestion = 'ℹ️ Stok sedang.';
+  else suggestion = '✅ Stok aman.';
+
+  let html = `<div style="font-weight:600;margin-bottom:6px">${escapeHtml(jenis || sumber || tujuan || 'Detail Bibit')}</div>`;
+  if(idVal) html += `<div><b>ID:</b> ${escapeHtml(idVal)}</div>`;
+  if(tanggal) html += `<div><b>📅 Tanggal:</b> ${escapeHtml(String(tanggal))}</div>`;
+  if(jenis) html += `<div><b>🌱 Jenis Tanaman:</b> ${escapeHtml(jenis)}</div>`;
+  if(masukRaw) html += `<div><b>📥 Jumlah Masuk:</b> ${escapeHtml(String(masukRaw))}</div>`;
+  if(keluarRaw) html += `<div><b>📤 Jumlah Keluar:</b> ${escapeHtml(String(keluarRaw))}</div>`;
+  html += `<div><b>📦 Stok Sekarang:</b> ${escapeHtml(String(running))}</div>`;
+  if(sumber) html += `<div><b>🏞️ Sumber:</b> ${escapeHtml(sumber)}</div>`;
+  if(tujuan) html += `<div><b>📍 Tujuan:</b> ${escapeHtml(tujuan)}</div>`;
+  if(pengawas) html += `<div><b>👷 Pengawas:</b> ${escapeHtml(pengawas)}</div>`;
+  if(status) html += `<div><b>✅ Status:</b> ${escapeHtml(status)}</div>`;
+  html += `<div class="small" style="margin-top:8px">💡 <b>Saran:</b> ${escapeHtml(suggestion)}</div>`;
+  return html;
+}
+
+/* ========== Command Handler ========== */
+function respondToCommand(cmd){
+  const q = cmd.trim().toLowerCase();
+  const totalMasuk = DATA.reduce((s,r)=> s + (r.masuk||0), 0);
+  const totalKeluar = DATA.reduce((s,r)=> s + (r.keluar||0), 0);
+  const lastRunning = (DATA.length>0) ? DATA[DATA.length-1].runningBalance : 0;
+  if(q === 'stok sekarang'){
+    createBubble(`<b>📦 Stok sekarang:</b> ${escapeHtml(String(lastRunning))}`, 'bot');
+    return true;
+  }
+  if(q === 'realisasi keluar'){
+    createBubble(`<b>📤 Total keluar:</b> ${escapeHtml(String(totalKeluar))}`, 'bot');
+    return true;
+  }
+  if(q === 'realisasi masuk'){
+    createBubble(`<b>📥 Total masuk:</b> ${escapeHtml(String(totalMasuk))}`, 'bot');
+    return true;
+  }
+  return false;
+}
+
+/* ========== API Gemini ========== */
+async function callGemini(prompt) {
+  if (!GEMINI_API_KEY) {
+    const errorMessage = `
+      ⚠️ <strong>Kesalahan Konfigurasi API Key</strong><br><br>
+      Harap masukkan API Key Gemini yang valid di dalam kode.<br>
+      Anda bisa mendapatkan kunci gratis dari <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.
+    `;
+    return errorMessage;
+  }
+
+  try {
+    // ⬇️⬇️⬇️ INILAH PERBAIKANNYA: Mengganti 'v1beta' menjadi 'v1' ⬇️⬇️⬇️
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }]
+        })
+      }
+    );
+    if (!resp.ok) {
+        const errorData = await resp.json();
+        console.error("Error dari Gemini API:", errorData);
+        if(errorData?.error?.message.includes("API key not valid")) {
+            return `
+              ⚠️ <strong>API Key Tidak Valid</strong><br><br>
+              Kunci yang Anda masukkan tidak dikenali oleh Google. Harap periksa kembali atau buat kunci baru di 
+              <a href="https://aistudio.google.com/app/apikey" target="_blank">Google AI Studio</a>.
+            `;
+        }
+        throw new Error(`HTTP ${resp.status} ${resp.statusText}. Pesan: ${errorData?.error?.message || 'Tidak ada pesan detail'}`);
+    }
+    const data = await resp.json();
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text || "(Tidak ada jawaban dari AI)";
+  } catch (err) {
+    console.error("Error saat memanggil Gemini API:", err);
+    return `⚠️ Gagal menghubungi AI: ${escapeHtml(err.message)}`;
+  }
+}
+
+/* ========== Search logic gabungan ========== */
+async function processQuery(q){
+  if(DATA.length === 0){
+    createBubble('⚠️ Data dari Sheety belum termuat. Mohon tunggu sebentar.', 'bot');
+    return;
+  }
+  if(respondToCommand(q)) return;
+  
+  const ql = q.toLowerCase().trim();
+
+  // Pencarian berdasarkan "id <nilai>"
+  if(ql.startsWith('id ')){
+    const idv = ql.slice(3).trim();
+    const rows = DATA.filter(r => (r.id || '').toString().toLowerCase() === idv);
+    if(!rows.length) { createBubble('🚫 Tidak ditemukan ID tersebut dalam data Sheety.', 'bot'); return; }
+    rows.forEach(r => createBubble(formatRowAsChat(r), 'bot'));
+    return;
+  }
+
+  // Pencarian berdasarkan "tanggal <nilai>"
+  if( ql.startsWith('tanggal ') || /\d{4}-\d{2}-\d{2}/.test(ql) ){
+    const token = ql.replace(/^tanggal\s+/,'').trim();
+    const rows = DATA.filter(r=>{
+      const s = (r.__date ? r.__date.toLocaleDateString() : (r.__dateRaw || '')).toLowerCase();
+      return s.includes(token.toLowerCase());
+    });
+    if(!rows.length){ createBubble('🚫 Tidak ada data untuk tanggal tersebut.', 'bot'); return; }
+    rows.slice(0,10).forEach(r=> createBubble(formatRowAsChat(r), 'bot'));
+    return;
+  }
+
+  // Pencarian umum di semua kolom
+  const results = DATA.filter(r => {
+    return Object.values(r.__raw || {}).some(v => (decodeMaybe(v) || '').toString().toLowerCase().includes(ql));
+  });
+
+  // Jika ditemukan di data Sheety, tampilkan
+  if(results.length > 0){
+    createBubble(`Menemukan ${results.length} hasil yang cocok di data Sheety:`, 'bot');
+    results.slice(0,5).forEach(r=> createBubble(formatRowAsChat(r), 'bot'));
+    return;
+  }
+
+  // Jika tidak ditemukan, panggil Gemini AI
+  createBubble("🤖 Tidak ditemukan di data lokal, mencoba bertanya pada AI...", "bot");
+  const answer = await callGemini(q);
+  createBubble(answer, "bot");
+}
+
+/* ========== UI interactions ========== */
+function userSend(q){
+  if(!q || !q.trim()) return;
+  createBubble(escapeHtml(q).replace(/\n/g,'<br>'), 'user');
+  inputEl.value='';
+  inputEl.style.height = '40px'; // Reset tinggi textarea
+  // Beri sedikit jeda agar pesan pengguna muncul sebelum bot merespon
+  setTimeout(()=> processQuery(q), 250);
+}
+
+sendBtn.addEventListener('click', ()=> userSend(inputEl.value));
+
+inputEl.addEventListener('keydown', (e)=>{
+  if(e.key==='Enter' && !e.shiftKey){
+    e.preventDefault(); // Mencegah baris baru di textarea
+    userSend(inputEl.value);
+  }
+});
+
+// Auto-resize textarea
+inputEl.addEventListener('input', () => {
+  inputEl.style.height = 'auto';
+  inputEl.style.height = (inputEl.scrollHeight) + 'px';
+});
+
+
+/* ========== Sheety fetch on Load ========== */
+window.addEventListener('DOMContentLoaded', () => {
+  createBubble('Halo! 👋 Saya sedang memuat data dari Sheety...', 'bot');
+  fetch(sheetyUrl)
+    .then(resp => {
+      if(!resp.ok) throw new Error('Gagal mengambil data dari Sheety (HTTP ' + resp.status + ')');
+      return resp.json();
+    })
+    .then(json => {
+      // Sheety biasanya membungkus data dalam kunci yang sesuai nama sheet
+      const sheetKey = Object.keys(json)[0];
+      if (!json[sheetKey]) {
+        throw new Error("Format respon Sheety tidak sesuai. Tidak ditemukan sheet data.");
+      }
+      RAW_DATA = json[sheetKey] || [];
+      DATA = normalizeAndCompute(RAW_DATA);
+      
+      const lastRow = DATA.length > 0 ? DATA[DATA.length - 1] : null;
+      const stokSekarang = lastRow ? lastRow.runningBalance : 0;
+      
+      createBubble(`✅ Data berhasil dimuat (${DATA.length} baris).<br>
+      📦 Stok bibit sekarang adalah: <b>${stokSekarang}</b>.<br><br>
+      Silakan ajukan pertanyaan Anda.`, 'bot');
+    })
+    .catch(err => {
+      createBubble(`⚠️ Gagal memuat data dari Sheety: ${escapeHtml(err.message)}`, 'bot');
+      console.error(err);
+    });
+});
+</script>
+</body>
+</html>
