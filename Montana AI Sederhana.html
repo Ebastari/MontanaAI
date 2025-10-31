@@ -1,251 +1,772 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Montana Chat AI </title>
+<title>Montana AI — Chat Analytics (Mobile)</title>
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
 <style>
-:root {
-  --bg:#0b141a; --header:#202c33; --accent:#00a884;
-  --user:#dcf8c6; --bot:#2a3942; --muted:#aebac1;
-}
-*{box-sizing:border-box;transition:all 0.2s ease;}
-html,body{height:100%;margin:0;font-family:'Inter',system-ui;background:var(--bg);color:#e9edef;}
-.frame{height:100vh;display:flex;align-items:center;justify-content:center;padding:12px;}
-.phone{width:100%;max-width:420px;height:92vh;background:#10191f;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.6);overflow:hidden;display:flex;flex-direction:column;}
-.header{height:62px;background:var(--header);display:flex;align-items:center;padding:10px 14px;gap:12px;}
-.avatar{width:42px;height:42px;border-radius:50%;object-fit:cover;}
-.meta .name{font-weight:600;font-size:16px;}
-.meta .sub{font-size:12px;color:var(--muted);}
-.banner{padding:8px 14px;text-align:center;color:var(--muted);font-size:13px;border-bottom:1px solid rgba(255,255,255,0.05);}
-.chat{flex:1;padding:14px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;background:#121c21;}
-.msg-row{display:flex;flex-direction:column;max-width:80%;animation:fadeIn 0.25s ease forwards;opacity:0;transform:translateY(6px);}
-.msg-row.user{align-self:flex-end;align-items:flex-end;}
-.msg-row.bot{align-self:flex-start;align-items:flex-start;}
-@keyframes fadeIn{to{opacity:1;transform:translateY(0);}}
-.bubble{padding:10px 14px;border-radius:14px;line-height:1.4;font-size:14px;max-width:100%;white-space:pre-wrap;}
-.bubble.user{background:var(--user);color:#000;border-bottom-right-radius:4px;}
-.bubble.bot{background:var(--bot);border-bottom-left-radius:4px;}
-.ts{font-size:11px;color:var(--muted);margin-top:4px;}
-.composer{display:flex;gap:8px;align-items:center;padding:10px;background:#162126;border-top:1px solid rgba(255,255,255,0.05);}
-textarea{flex:1;min-height:40px;padding:10px;border-radius:22px;border:none;background:#1a2a30;color:#fff;font-size:15px;outline:none;resize:none;max-height:100px;}
-textarea:focus{background:#20363d;}
-.send{width:46px;height:46px;border-radius:50%;background:var(--accent);border:none;color:#fff;font-weight:700;font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;}
-.quick-btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;margin-left:auto;margin-right:auto;max-width:80%;align-self:flex-start;}
-.quick-btn{background:#223b42;color:#fff;padding:6px 10px;border:none;border-radius:16px;cursor:pointer;font-size:13px;}
-.quick-btn:hover{background:#2b4f56;}
-.chat>select,.chat>input[type="date"]{display:block;margin:8px 0;max-width:80%;padding:8px;border-radius:8px;border:none;background:#1a2a30;color:#fff;font-size:14px;outline:none;align-self:flex-start;}
-.chat>select:focus,.chat>input[type="date"]:focus{outline:2px solid var(--accent);}
+  :root{
+    --bg:#0b141a; --panel:#0f1720; --accent:#0f9d80; --card:#111821; --muted:#9aa6ad; --text:#e9edf0;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--text)}
+  .frame{height:100vh;display:flex;align-items:center;justify-content:center;padding:10px}
+  .phone {
+    width:100%; max-width:460px; height:94vh;
+    background:linear-gradient(180deg,var(--panel),#071014);
+    border-radius:12px; box-shadow:0 20px 50px rgba(0,0,0,0.6);
+    overflow:hidden; display:flex; flex-direction:column;
+    border:1px solid rgba(255,255,255,0.02);
+  }
+
+  /* Header */
+  .header{display:flex;align-items:center;gap:12px;padding:12px 14px;background:transparent}
+  .avatar{width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.04)}
+  .meta{flex:1}
+  .meta .title{font-weight:600;font-size:15px}
+  .meta .sub{font-size:12px;color:var(--muted)}
+
+  /* Banner */
+  .banner{padding:8px 14px;text-align:center;color:var(--muted);font-size:13px;border-top:1px solid rgba(255,255,255,0.02);border-bottom:1px solid rgba(255,255,255,0.02)}
+
+  /* Chat area */
+  .chat {flex:1;padding:12px;overflow:auto;background:linear-gradient(180deg,#071014,#071018);display:flex;flex-direction:column;gap:10px}
+  .msg-row{display:flex;flex-direction:column;max-width:86%}
+  .msg-row.user{align-self:flex-end;align-items:flex-end}
+  .msg-row.bot{align-self:flex-start;align-items:flex-start}
+  .bubble{
+    padding:10px 12px;border-radius:12px;line-height:1.45;font-size:14px;background:var(--card);color:var(--text);box-shadow:0 2px 6px rgba(0,0,0,0.4);
+    white-space:pre-wrap; word-break:break-word;
+  }
+  .bubble.user{background:#dfeee7;color:#0b1411}
+  .ts{font-size:11px;color:var(--muted);margin-top:6px}
+
+  /* Composer */
+  .composer{display:flex;gap:8px;padding:10px;background:linear-gradient(180deg,#071018,#061014);border-top:1px solid rgba(255,255,255,0.02)}
+  .input{flex:1;display:flex;align-items:center}
+  .input textarea{width:100%;min-height:44px;max-height:120px;padding:10px;border-radius:999px;border:none;background:#0e2624;color:var(--text);font-size:14px;resize:none;outline:none}
+  .send{width:46px;height:46px;border-radius:50%;border:none;background:var(--accent);color:#fff;font-weight:700;cursor:pointer}
+
+  /* Shortcuts menu */
+  .shortcuts{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;padding:0 12px 8px 12px}
+  .sc-btn{padding:8px 10px;border-radius:10px;background:#0b2a28;color:var(--text);font-size:13px;border:1px solid rgba(255,255,255,0.02);cursor:pointer}
+
+  /* Modal for charts/tables */
+  .modal {
+    position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);z-index:60;padding:16px;
+  }
+  .modal.show{display:flex}
+  .modal-card{width:100%;max-width:900px;background:#071018;border-radius:12px;padding:14px;box-shadow:0 8px 30px rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.02);max-height:90vh;overflow:auto}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}
+  .modal-close{background:#122a27;color:#fff;border:none;padding:8px 10px;border-radius:8px;cursor:pointer}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;color:var(--text)}
+  thead th{position:sticky;top:0;background:#071018;padding:8px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.04);color:var(--muted)}
+  tbody td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.02)}
+  .small{font-size:12px;color:var(--muted)}
+
+  @media (max-width:420px){
+    .phone{height:100vh;border-radius:0}
+    .chat{padding:10px}
+  }
 </style>
 </head>
-
 <body>
-<div class="frame">
-  <div class="phone">
-    <div class="header">
-      <img class="avatar" src="https://i.pravatar.cc/150?img=5" alt="Montana">
-      <div class="meta">
-        <div class="name">Montana AI</div>
-        <div class="sub">Asisten Monitoring Tanaman AI</div>
+  <div class="frame">
+    <div class="phone" role="application" aria-label="Montana Chat Analytics">
+      <div class="header">
+        <img class="avatar" src="https://i.pravatar.cc/150?img=5" alt="Montana">
+        <div class="meta">
+          <div class="title">Montana AI</div>
+          <div class="sub">Chat Analytics — Data Nursery</div>
+        </div>
+        <button id="btnMenu" class="sc-btn" title="Menu">Menu</button>
+      </div>
+
+      <div class="banner" id="bannerText">Muat data dari server. Aplikasi ini hanya menampilkan data (read-only).</div>
+
+      <div id="chat" class="chat" aria-live="polite"></div>
+
+      <div class="shortcuts" id="shortcuts">
+        <!-- shortcuts inserted dynamically -->
+      </div>
+
+      <div class="composer">
+        <div class="input">
+          <textarea id="input" placeholder="Ketik perintah: laporan harian / laporan 2025-10-30 / analisis stok / stok [jenis] / realisasi keluar"></textarea>
+        </div>
+        <button id="sendBtn" class="send">Kirim</button>
       </div>
     </div>
-    <div class="banner">🔒 Data Bersifat Rahasia</div>
-    <div id="chat" class="chat" aria-live="polite"></div>
-    <div class="composer">
-      <textarea id="input" placeholder="Ketik pesan Anda..." disabled></textarea>
-      <button class="send" id="sendBtn" disabled>➤</button>
+  </div>
+
+  <!-- Modal: charts / tables -->
+  <div id="modal" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div id="modalTitle" style="font-weight:600"></div>
+        <div>
+          <button id="modalClose" class="modal-close">Tutup</button>
+        </div>
+      </div>
+      <div id="modalBody"></div>
     </div>
   </div>
-</div>
 
 <script>
-const chat=document.getElementById('chat');
-const input=document.getElementById('input');
-const sendBtn=document.getElementById('sendBtn');
-let DATA=[],RAW=[];
-const sheetyUrl='https://api.sheety.co/ecf70bd684db7a654a0aa41957dff1a8/nursery/bibit';
+/* ================= CONFIG ================= */
+const API_URL = 'https://script.google.com/macros/s/AKfycbzC7tIzkd--1SENzfonhD7sCZn4ETRPTIyxxy9l5NS5BnZtx7bAexf0HTi5mk9Z1I6UJg/exec';
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
 
-const scrollBottom=()=>chat.scrollTop=chat.scrollHeight;
-const timeNow=()=>new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+/* ================= UI helpers ================= */
+const chatEl = document.getElementById('chat');
+const inputEl = document.getElementById('input');
+const sendBtn = document.getElementById('sendBtn');
+const shortcutsEl = document.getElementById('shortcuts');
+const modalEl = document.getElementById('modal');
+const modalBody = document.getElementById('modalBody');
+const modalTitle = document.getElementById('modalTitle');
+const modalClose = document.getElementById('modalClose');
+const bannerText = document.getElementById('bannerText');
 
-function bubble(txt,who='bot'){
-  const row=document.createElement('div');
-  row.className=`msg-row ${who}`;
-  row.innerHTML=`<div class="bubble ${who}">${txt}</div><div class="ts">${timeNow()}</div>`;
-  chat.appendChild(row); scrollBottom();
+function nowTime(){
+  return new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
 }
-
-function quickReplies(options){
-  const div=document.createElement('div');
-  div.className='quick-btns';
-  options.forEach(opt=>{
-    const b=document.createElement('button');
-    b.className='quick-btn'; b.textContent=opt.label;
-    b.onclick=()=>{bubble(opt.label,'user');opt.action();div.remove();};
-    div.appendChild(b);
-  });
-  chat.appendChild(div); scrollBottom();
+function createBubble(html, who='bot'){
+  const wrapper = document.createElement('div');
+  wrapper.className = 'msg-row ' + (who==='user' ? 'user' : 'bot');
+  const b = document.createElement('div');
+  b.className = 'bubble ' + (who==='user' ? 'user' : 'bot');
+  b.innerHTML = html;
+  const ts = document.createElement('div');
+  ts.className = 'ts';
+  ts.textContent = nowTime();
+  wrapper.appendChild(b);
+  wrapper.appendChild(ts);
+  chatEl.appendChild(wrapper);
+  chatEl.scrollTop = chatEl.scrollHeight;
 }
+function showModal(title, contentHtml){
+  modalTitle.textContent = title;
+  modalBody.innerHTML = contentHtml;
+  modalEl.classList.add('show');
+}
+function closeModal(){ modalEl.classList.remove('show'); modalBody.innerHTML=''; }
 
-function parseFlexibleDate(tgl){
-  if(!tgl) return null;
-  let d=null;
-  if(/\d{4}-\d{2}-\d{2}/.test(tgl)) d=new Date(tgl);
-  else if(/\d{2}\/\d{2}\/\d{4}/.test(tgl)){
-    const [dd,mm,yy]=tgl.split('/').map(Number);
-    d=new Date(yy,mm-1,dd);
-  } else {
-    const tryD=new Date(tgl);
-    if(!isNaN(tryD)) d=tryD;
+/* ================= Data fetch & normalize ================= */
+let CACHE = { ts:0, data:[] };
+
+async function fetchData(limit = 0, force=false){
+  if(!force && Date.now() - CACHE.ts < CACHE_TTL && CACHE.data.length) return CACHE.data;
+  try{
+    const url = API_URL + (limit>0 ? `?limit=${limit}` : '');
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('Server response ' + res.status);
+    const json = await res.json();
+    // If response wrapper {data: [...]}, use that
+    const raw = Array.isArray(json) ? json : (json.data || json);
+    CACHE = { ts: Date.now(), data: raw || [] };
+    bannerText.textContent = `Data dimuat: ${CACHE.data.length} baris (pembaruan: ${new Date().toLocaleString('id-ID')})`;
+    return CACHE.data;
+  }catch(err){
+    bannerText.textContent = 'Gagal memuat data: ' + err.message;
+    throw err;
   }
-  return d && !isNaN(d)?d:null;
 }
 
 function toNum(v){
-  if(typeof v==="number") return v;
-  if(!v) return 0;
-  const s=String(v).replace(/[^\d\-.,]/g,'').replace(',','.');
-  const n=parseFloat(s);
-  return isNaN(n)?0:n;
+  if (v === null || v === undefined) return 0;
+  const s = String(v).replace(/[^\d\-.,]/g,'').replace(',', '.');
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+function parseDateFlexible(s){
+  if(!s) return null;
+  const tryDate = new Date(String(s));
+  if(!isNaN(tryDate)) return tryDate;
+  const m = String(s).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if(m){ return new Date(parseInt(m[3],10), parseInt(m[2],10)-1, parseInt(m[1],10)); }
+  return null;
 }
 
-function normalize(raw){
-  return raw.map(r=>{
-    const tgl=r.Tanggal||r.tanggal||r.date||'';
-    const bibit=r.Bibit||r.bibit||r.jenis||'Tidak Diketahui';
-    const masuk=toNum(r.Masuk||r.masuk);
-    const keluar=toNum(r.Keluar||r.keluar);
-    const mati=toNum(r.Mati||r.mati);
-    const totalFromSheet=toNum(r.Total||r.total);
-    const d=parseFlexibleDate(tgl);
-    return {bibit,masuk,keluar,mati,totalFromSheet,tanggal:tgl,__date:d};
-  }).filter(r=>r.__date);
+function normalizeRows(raw){
+  return raw.map((r, idx) => {
+    const mapKey = key => {
+      if(!r) return '';
+      const keys = Object.keys(r);
+      const exact = keys.find(k => k.toLowerCase().trim() === key);
+      if(exact) return r[exact];
+      const alt = keys.find(k => k.toLowerCase().includes(key));
+      return alt ? r[alt] : '';
+    };
+    const tanggalRaw = r.Tanggal ?? r.tanggal ?? r.Date ?? r.date ?? mapKey('tanggal') ?? '';
+    const bibit = r.Bibit ?? r.bibit ?? r.Jenis ?? r.jenis ?? mapKey('bibit') ?? 'Unknown';
+    const masuk = toNum(r.Masuk ?? r.masuk ?? r['Jumlah Masuk'] ?? r['jumlah masuk'] ?? mapKey('masuk'));
+    const keluar = toNum(r.Keluar ?? r.keluar ?? r['Jumlah Keluar'] ?? mapKey('keluar'));
+    const mati = toNum(r.Mati ?? r.mati ?? r['Jumlah Mati'] ?? mapKey('mati'));
+    const sumber = r.Sumber ?? r.sumber ?? mapKey('sumber') ?? '';
+    const tujuan = r.Tujuan ?? r.tujuan ?? mapKey('tujuan') ?? '';
+    const pengawas = r.Pengawas ?? r.pengawas ?? mapKey('pengawas') ?? '';
+    const parsedDate = parseDateFlexible(tanggalRaw);
+    return {
+      __idx: idx,
+      __raw: r,
+      TanggalRaw: tanggalRaw,
+      Tanggal: parsedDate,
+      Bibit: String(bibit).trim(),
+      Masuk: masuk,
+      Keluar: keluar,
+      Mati: mati,
+      Sumber: String(sumber).trim(),
+      Tujuan: String(tujuan).trim(),
+      Pengawas: String(pengawas).trim()
+    };
+  }).filter(x => x); // keep all (some Tanggal may be null)
 }
 
-const greetings = [
-  "Halo, selamat datang di Montana AI, Aplikasi Artificial Intelligence. Senang dapat membantu Anda hari ini.",
-  "Hai, terima kasih telah menggunakan layanan Montana AI. Apa yang ingin Anda cek hari ini?",
-  "Halo, Montana AI siap membantu Anda memantau dan menganalisis data bibit.",
-  "Assalamualaikum 🌿, Montana AI siap membantu Anda dengan data terbaru.",
-  "Halo, Montana AI hadir untuk mempermudah Anda dalam memantau stok bibit.",
-  "Hai, sistem Montana AI siap digunakan. Silakan pilih menu yang Anda perlukan.",
-  "Selamat datang kembali di Montana AI 👋. Mari kita lihat perkembangan data terkini.",
-  "Halo, Montana AI siap memberikan laporan dan rekap data bibit sesuai kebutuhan Anda.",
-  "Hai, Montana AI siap melayani Anda dengan data bibit yang akurat dan terbarui.",
-  "Halo, senang bertemu kembali. Montana AI siap membantu Anda mengelola data hari ini."
-];
+/* ================= Aggregation helpers ================= */
+function groupBy(arr, keyFn){
+  return arr.reduce((acc, it) => {
+    const k = keyFn(it);
+    (acc[k] ||= []).push(it);
+    return acc;
+  }, {});
+}
+function formatNumber(n){ return n.toLocaleString('id-ID'); }
 
-const botSay=async(t)=>{await new Promise(r=>setTimeout(r,400));bubble(t,'bot');};
+/* ================= Reports & Analysis ================= */
+function reportDaily(rows, date = new Date()){
+  const dayStr = date.toISOString().slice(0,10);
+  const filt = rows.filter(r => r.Tanggal && r.Tanggal.toISOString().slice(0,10) === dayStr);
+  const masuk = filt.reduce((s,r)=>s + r.Masuk, 0);
+  const keluar = filt.reduce((s,r)=>s + r.Keluar, 0);
+  const mati = filt.reduce((s,r)=>s + r.Mati, 0);
+  const totalNet = masuk - keluar - mati;
+  const byType = groupBy(filt, r => r.Bibit);
+  const rekap = Object.entries(byType).map(([k,v]) => ({ jenis:k, total: v.reduce((s,x)=>s + x.Masuk - x.Keluar - x.Mati, 0) }))
+    .sort((a,b)=>b.total - a.total);
+  const top = rekap.slice(0,5);
+  let narrative = `Ringkasan Harian — ${date.toLocaleDateString('id-ID')}\n\n`;
+  narrative += `Total masuk: ${formatNumber(masuk)}\n`;
+  narrative += `Total keluar: ${formatNumber(keluar)}\n`;
+  narrative += `Total mati: ${formatNumber(mati)}\n`;
+  narrative += `Total net (masuk - keluar - mati): ${formatNumber(totalNet)}\n\n`;
+  narrative += `Jenis dominan hari ini:\n`;
+  if(top.length) top.forEach(t => narrative += `- ${t.jenis}: ${formatNumber(t.total)}\n`);
+  else narrative += '- Tidak ada transaksi hari ini.\n';
+  return { narrative, data: filt, metrics:{masuk,keluar,mati,totalNet}, top };
+}
 
-async function loadData(){
-  await botSay("🔄 Sedang memuat data dari Nursery...");
-  try{
-    const r=await fetch(sheetyUrl);
-    if(!r.ok) throw new Error(`HTTP ${r.status}`);
-    const j=await r.json();
-    const key=Object.keys(j).find(k=>Array.isArray(j[k]));
-    RAW=j[key]||[];
-    DATA=normalize(RAW);
-    if(!DATA.length) throw new Error("Tidak ada data valid dari Sheety.");
-    input.disabled=false;sendBtn.disabled=false;
-    await botSay(`✅ Data berhasil dimuat (${DATA.length} baris data).`);
-    const greet=greetings[Math.floor(Math.random()*greetings.length)];
-    await botSay(greet+"<br><br>Silakan pilih menu di bawah:");
-    showMainMenu();
-  }catch(e){
-    console.error(e);
-    botSay(`⚠️ Gagal memuat data. Pastikan URL Sheety dan sheet Anda publik. (${e.message})`);
+function reportPeriod(rows, period='weekly', refDate=new Date()){
+  const end = new Date(refDate);
+  const start = new Date(refDate);
+  if(period === 'weekly'){ start.setDate(end.getDate() - 6); }
+  else if(period === 'monthly'){ start.setMonth(end.getMonth()); start.setDate(1); }
+  else if(period === 'yearly'){ start.setFullYear(end.getFullYear()); start.setMonth(0); start.setDate(1); }
+  const filt = rows.filter(r => r.Tanggal && r.Tanggal >= start && r.Tanggal <= end);
+  const masuk = filt.reduce((s,r)=>s + r.Masuk, 0);
+  const keluar = filt.reduce((s,r)=>s + r.Keluar, 0);
+  const mati = filt.reduce((s,r)=>s + r.Mati, 0);
+  const totalNet = masuk - keluar - mati;
+  return { period, start, end, masuk, keluar, mati, totalNet, rows:filt };
+}
+
+function analysisStockPerType(rows){
+  const grouped = groupBy(rows, r => r.Bibit || 'Unknown');
+  const result = Object.entries(grouped).map(([jenis, items]) => {
+    const masuk = items.reduce((s,i)=>s + i.Masuk, 0);
+    const keluar = items.reduce((s,i)=>s + i.Keluar, 0);
+    const mati = items.reduce((s,i)=>s + i.Mati, 0);
+    const stok = masuk - keluar - mati;
+    return { jenis, masuk, keluar, mati, stok };
+  }).sort((a,b)=>b.stok - a.stok);
+  return result;
+}
+
+function analysisTeamPerformance(rows){
+  const grouped = groupBy(rows, r => r.Pengawas || 'Syahrudin');
+  const result = Object.entries(grouped).map(([team, items]) => {
+    const masuk = items.reduce((s,i)=>s + i.Masuk, 0);
+    const keluar = items.reduce((s,i)=>s + i.Keluar, 0);
+    const mati = items.reduce((s,i)=>s + i.Mati, 0);
+    const net = masuk - keluar - mati;
+    const mortalityRate = masuk > 0 ? (mati / masuk * 100) : 0;
+    const efficiency = masuk > 0 ? ((masuk - mati) / masuk * 100) : 0;
+    return { team, masuk, keluar, mati, net, mortalityRate, efficiency };
+  }).sort((a,b)=>b.efficiency - a.efficiency);
+  return result;
+}
+
+function analysisInternalVsExternal(rows){
+  const internalKeywords = ['pembibitan','internal','nursery','ebl','energi','internal nursery'];
+  const classified = rows.map(r => {
+    const s = (r.Sumber || '').toLowerCase();
+    const isInternal = internalKeywords.some(k => s.includes(k));
+    return {...r, isInternal};
+  });
+  const grouped = groupBy(classified, r => r.isInternal ? 'Internal' : 'Eksternal');
+  const summary = Object.entries(grouped).map(([k,items]) => {
+    const masuk = items.reduce((s,i)=>s + i.Masuk, 0);
+    const keluar = items.reduce((s,i)=>s + i.Keluar, 0);
+    const mati = items.reduce((s,i)=>s + i.Mati, 0);
+    return { sumber:k, masuk, keluar, mati, count: items.length };
+  });
+  return summary;
+}
+
+function detectAnomalies(rows){
+  const byType = groupBy(rows, r => r.Bibit || 'Unknown');
+  const anomalies = [];
+  Object.entries(byType).forEach(([jenis, items]) => {
+    const byDate = groupBy(items.filter(x=>x.Tanggal), x => x.Tanggal.toISOString().slice(0,10));
+    const dates = Object.keys(byDate).sort();
+    if(dates.length < 3) return;
+    const dailyNet = dates.map(d => byDate[d].reduce((s,i)=>s + i.Masuk - i.Keluar - i.Mati, 0));
+    const avg = dailyNet.reduce((a,b)=>a+b,0) / dailyNet.length;
+    const last = dailyNet[dailyNet.length-1];
+    if(avg !== 0 && Math.abs((last - avg) / (Math.abs(avg) || 1)) > 0.6){
+      anomalies.push({ jenis, issue: 'Perubahan net harian signifikan', avg: Math.round(avg), last: last });
+    }
+    const mortDaily = dates.map(d => byDate[d].reduce((s,i)=>s + i.Mati, 0));
+    const avgMort = mortDaily.reduce((a,b)=>a+b,0) / mortDaily.length;
+    const lastMort = mortDaily[mortDaily.length-1];
+    if(avgMort > 0 && lastMort / avgMort > 3){
+      anomalies.push({ jenis, issue: 'Lonjakan mortalitas', avgMort: Math.round(avgMort), lastMort });
+    }
+  });
+  return anomalies;
+}
+
+/* ================= Chart helpers ================= */
+function renderBarChart(containerId, labels, data, labelText){
+  const ctx = document.getElementById(containerId).getContext('2d');
+  return new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label: labelText, data, backgroundColor: 'rgba(15,157,128,0.85)' }] },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}} }
+  });
+}
+function renderLineChart(containerId, labels, datasets){
+  const ctx = document.getElementById(containerId).getContext('2d');
+  return new Chart(ctx, { type:'line', data:{ labels, datasets }, options:{ responsive:true, maintainAspectRatio:false }});
+}
+
+/* ============ Narasi Analisis Otomatis ============ */
+function generateNarrative(type, d) {
+  if(!d) d = {};
+  switch(type) {
+    case 'realisasi_keluar': {
+      const lines = [];
+      lines.push(`Realisasi Keluar — Ringkasan periode terpilih`);
+      lines.push(`Total bibit keluar: ${formatNumber(d.total || 0)} unit.`);
+      lines.push(`Jenis dominan keluaran: ${d.jenisDominan || 'Tidak tersedia'}.`);
+      if(d.tanggalPuncak) lines.push(`Puncak distribusi terjadi: ${d.tanggalPuncak}.`);
+      if(typeof d.proporsiKeluar === 'number') lines.push(`Kontribusi puncak terhadap mingguan: ${d.proporsiKeluar}%`);
+      if(d.lokasiUtama) lines.push(`Lokasi distribusi utama: ${d.lokasiUtama}.`);
+      lines.push('');
+      lines.push(`Analisis singkat: Tren menunjukkan permintaan yang meningkat untuk jenis ${d.jenisDominan || 'tertentu'}. Disarankan menjaga buffer stok minimal 10% di atas rata-rata keluaran mingguan untuk menghindari kekosongan suplai.`);
+      return lines.join('\n');
+    }
+
+    case 'realisasi_masuk': {
+      const lines = [];
+      lines.push(`Realisasi Masuk — Ringkasan periode terpilih`);
+      lines.push(`Total bibit masuk: ${formatNumber(d.total || 0)} unit.`);
+      lines.push(`Jenis terbesar berdasarkan masuk: ${d.jenis1 || 'Tidak tersedia'} (${d.kontribusi1 || 0}%), ${d.jenis2 || 'Tidak tersedia'} (${d.kontribusi2 || 0}%).`);
+      lines.push('');
+      lines.push(`Analisis singkat: Peningkatan penambahan bibit menunjukkan keberhasilan proses pembibitan internal. Pertahankan pengawasan mortalitas untuk memastikan efisiensi. Rekomendasi target perbanyakan: +12% pada periode berikut.`);
+      return lines.join('\n');
+    }
+
+    case 'per_jenis': {
+      const lines = [];
+      lines.push(`Analisis Per Jenis — Stok & Tren`);
+      lines.push(`Jenis tertinggi: ${d.top1 || '-'} (${formatNumber(d.top1stok || 0)}), ${d.top2 || '-'} (${formatNumber(d.top2stok || 0)}), ${d.top3 || '-'} (${formatNumber(d.top3stok || 0)}).`);
+      lines.push(`Jenis terendah: ${d.low1 || '-'} (${formatNumber(d.low1stok || 0)}), ${d.low2 || '-'} (${formatNumber(d.low2stok || 0)}).`);
+      lines.push('');
+      lines.push(`Analisis singkat: Jenis berputar cepat memerlukan manajemen aliran stok (rotasi). Untuk jenis dengan stok rendah direkomendasikan melakukan perbanyakan ulang dan pemantauan mortalitas ketat pada fase awal.`);
+      return lines.join('\n');
+    }
+
+    case 'per_tanggal': {
+      const lines = [];
+      lines.push(`Laporan Per Tanggal — ${d.tanggal || '-'}`);
+      lines.push(`Bibit keluar: ${formatNumber(d.keluar || 0)} (${d.jenisDominan || '-'})`);
+      lines.push(`Bibit masuk: ${formatNumber(d.masuk || 0)}`);
+      lines.push(`Bibit mati: ${formatNumber(d.mati || 0)}`);
+      lines.push(`Nett hari itu: ${formatNumber(d.net || 0)}`);
+      lines.push('');
+      lines.push(`Analisis singkat: ${d.trenHari && d.trenHari>1 ? `Terjadi tren penurunan selama ${d.trenHari} hari terakhir.` : 'Tidak ada tren penurunan berulang yang signifikan.'}`);
+      lines.push(`Rekomendasi: tingkatkan suplai jenis ${d.jenisDominan || '-'} dalam 48 jam jika penurunan berlanjut.`);
+      return lines.join('\n');
+    }
+
+    case 'bulanan': {
+      const lines = [];
+      lines.push(`Laporan Bulanan — ${d.bulan || '-'}`);
+      lines.push(`Perubahan stok dibanding bulan sebelumnya: ${d.kenaikanPersen || 0}%`);
+      if(d.topJenis1) lines.push(`Kontributor terbesar: ${d.topJenis1} (+${formatNumber(d.jumlah1 || 0)}) dan ${d.topJenis2} (+${formatNumber(d.jumlah2 || 0)})`);
+      lines.push('');
+      lines.push(`Analisis singkat: Penurunan mortalitas menunjukkan perbaikan operasional. Jika tren bertahan, proyeksi stok akhir bulan berikut dapat mencapai ${formatNumber(d.proyeksi || 0)} bibit.`);
+      return lines.join('\n');
+    }
+
+    case 'tahunan': {
+      const lines = [];
+      lines.push(`Laporan Tahunan — Sampai ${d.bulanAkhir || '-'} ${d.tahun || '-'}`);
+      lines.push(`Total bibit dikelola: ${formatNumber(d.total || 0)} unit dari ${d.jumlahJenis || 0} jenis.`);
+      lines.push(`Pertumbuhan stok bersih: ${d.kenaikanPersen || 0}%`);
+      if(d.produktif) lines.push(`Bibit paling produktif: ${d.produktif}`);
+      lines.push('');
+      lines.push(`Analisis singkat: Efisiensi produksi ${d.efisiensi || 0}%; direkomendasikan peningkatan kapasitas persemaian ${d.rekomendasi || 10}% tahun berikutnya.`);
+      return lines.join('\n');
+    }
+
+    case 'internal_vs_external': {
+      const lines = [];
+      lines.push(`Perbandingan Internal vs Eksternal`);
+      (d.summary||[]).forEach(s => {
+        lines.push(`${s.sumber}: Masuk ${formatNumber(s.masuk)}, Keluar ${formatNumber(s.keluar)}, Mati ${formatNumber(s.mati)}.`);
+      });
+      lines.push('');
+      lines.push(`Analisis singkat: Jika kontribusi eksternal tinggi, pertimbangkan strategi peningkatan produksi internal untuk mengurangi risiko pasokan.`);
+      return lines.join('\n');
+    }
+
+    case 'anomalies': {
+      if(!d || !d.length) return 'Tidak ditemukan anomali signifikan dalam periode yang dianalisis.';
+      const lines = ['Anomali terdeteksi:'];
+      d.forEach(a => {
+        if(a.issue === 'Perubahan net harian signifikan'){
+          lines.push(`- ${a.jenis}: perubahan net harian mendadak (rata-rata ${a.avg}, nilai terakhir ${a.last}).`);
+        } else if(a.issue === 'Lonjakan mortalitas'){
+          lines.push(`- ${a.jenis}: lonjakan mortalitas (rata-rata ${a.avgMort || '?'} hari, terakhir ${a.lastMort}).`);
+        } else {
+          lines.push(`- ${a.jenis}: ${a.issue}`);
+        }
+      });
+      lines.push('');
+      lines.push('Rekomendasi: investigasi penyebab, cek catatan pengiriman dan kondisi lapangan pada tanggal-anomali.');
+      return lines.join('\n');
+    }
+
+    default:
+      return '';
   }
 }
 
-function showMainMenu(){
-  quickReplies([
-    {label:'Realisasi Harian',action:()=>showRealisasi('harian')},
-    {label:'Realisasi Mingguan',action:()=>showRealisasi('mingguan')},
-    {label:'Realisasi Tahunan',action:()=>showRealisasi('tahunan')},
-    {label:'Realisasi Masuk',action:showMasuk},
-    {label:'Realisasi Keluar',action:showKeluar},
-    {label:'Stok Global',action:showStok},
-    {label:'Jenis Bibit',action:showJenis},
-    {label:'Tanggal',action:showTanggal}
-  ]);
-}
+/* ================= Chat commands & shortcuts ================= */
+const SHORTCUTS = [
+  { id:'laporan_harian', label:'Laporan Harian' },
+  { id:'laporan_mingguan', label:'Laporan Mingguan' },
+  { id:'laporan_bulanan', label:'Laporan Bulanan' },
+  { id:'realisasi_masuk', label:'Realisasi Masuk' },
+  { id:'realisasi_keluar', label:'Realisasi Keluar' },
+  { id:'analisis_stok', label:'Analisis Stok per Jenis' },
+  { id:'analisis_tim', label:'Analisis Kinerja Tim' },
+  { id:'internal_vs_eksternal', label:'Internal vs Eksternal' },
+  { id:'grafik_stok', label:'Grafik Stok per Jenis' },
+  { id:'laporan_tanggal', label:'Laporan per Tanggal' },
+  { id:'deteksi_anomali', label:'Deteksi Anomali' },
+  { id:'bantuan', label:'Bantuan & Panduan' }
+];
 
-async function showRealisasi(mode){
-  await botSay(`📊 Menampilkan realisasi ${mode}...`);
-  if(DATA.length===0)return botSay("Tidak ada data.");
-  const today=new Date();today.setHours(0,0,0,0);
-  let filtered=[];
-  if(mode==='harian')filtered=DATA.filter(d=>d.__date.toDateString()===today.toDateString());
-  if(mode==='mingguan'){const start=new Date(today);start.setDate(today.getDate()-today.getDay());filtered=DATA.filter(d=>d.__date>=start);}
-  if(mode==='tahunan'){const start=new Date(today.getFullYear(),0,1);filtered=DATA.filter(d=>d.__date>=start);}
-  const masuk=filtered.reduce((a,b)=>a+b.masuk,0);
-  const keluar=filtered.reduce((a,b)=>a+b.keluar,0);
-  const mati=filtered.reduce((a,b)=>a+b.mati,0);
-  await botSay(`<b>Realisasi ${mode}:</b><br>📥 Masuk: ${masuk}<br>📤 Keluar: ${keluar}<br>⚰️ Mati: ${mati}`);
-  showMainMenu();
-}
-
-async function showMasuk(){
-  const total=DATA.reduce((a,b)=>a+b.masuk,0);
-  await botSay(`📥 Total realisasi masuk: <b>${total}</b> bibit.`);
-  showMainMenu();
-}
-
-async function showKeluar(){
-  const total=DATA.reduce((a,b)=>a+b.keluar,0);
-  await botSay(`📤 Total realisasi keluar: <b>${total}</b> bibit.`);
-  showMainMenu();
-}
-
-async function showStok(){
-  let totalSheet = 0;
-  let totalManual = 0;
-  DATA.forEach(r => {
-    if (r.totalFromSheet && r.totalFromSheet !== 0) totalSheet += r.totalFromSheet;
-    else totalManual += (r.masuk - r.keluar - r.mati);
+function initShortcuts(){
+  shortcutsEl.innerHTML = '';
+  SHORTCUTS.forEach(s => {
+    const btn = document.createElement('button');
+    btn.className = 'sc-btn';
+    btn.textContent = s.label;
+    btn.onclick = () => handleShortcut(s.id);
+    shortcutsEl.appendChild(btn);
   });
-  const finalTotal = totalSheet > 0 ? totalSheet : totalManual;
-  await botSay(`📦 Stok global saat ini: <b>${finalTotal}</b> bibit.<br><small>${totalSheet>0?"(berdasarkan kolom Total di Sheet)":"(dihitung manual dari Masuk-Keluar-Mati)"}</small>`);
-  showMainMenu();
 }
 
-async function showJenis(){
-  const jenis=[...new Set(DATA.map(d=>d.bibit))].filter(Boolean);
-  await botSay("🌱 Pilih jenis bibit:");
-  const select=document.createElement('select');
-  select.innerHTML='<option value="">-- Pilih Jenis Bibit --</option>'+jenis.map(j=>`<option value="${j}">${j}</option>`).join('');
-  select.onchange=()=>{const v=select.value;if(v){bubble(v,'user');showDataByJenis(v);select.remove();}};
-  chat.appendChild(select);scrollBottom();
+/* ================= High-level handlers ================= */
+async function handleShortcut(id){
+  try{
+    createBubble('Permintaan: ' + (SHORTCUTS.find(s=>s.id===id)?.label || id), 'user');
+    const raw = await fetchData();
+    const rows = normalizeRows(raw);
+
+    switch(id){
+      case 'laporan_harian': {
+        const rep = reportDaily(rows, new Date());
+        createBubble(rep.narrative, 'bot');
+        const html = `<div><strong>Rekap jenis (top 10)</strong><div class="small">Urut berdasarkan stok net hari ini</div><table><thead><tr><th>Jenis</th><th>Net</th></tr></thead><tbody>${rep.top.map(t=>`<tr><td>${escapeHtml(t.jenis)}</td><td>${formatNumber(t.total)}</td></tr>`).join('')}</tbody></table></div>`;
+        showModal('Detail Laporan Harian', html);
+        createBubble('Laporan harian selesai. Anda dapat menutup jendela detail untuk kembali ke chat.', 'bot');
+        break;
+      }
+
+      case 'laporan_mingguan': {
+        const rep = reportPeriod(rows, 'weekly', new Date());
+        const narrative = `Laporan Mingguan\nPeriode: ${rep.start.toLocaleDateString('id-ID')} - ${rep.end.toLocaleDateString('id-ID')}\nMasuk: ${formatNumber(rep.masuk)}\nKeluar: ${formatNumber(rep.keluar)}\nMati: ${formatNumber(rep.mati)}\nNet: ${formatNumber(rep.totalNet)}`;
+        createBubble(narrative, 'bot');
+        showModal('Detail Laporan Mingguan', `<pre>${escapeHtml(narrative)}</pre>`);
+        break;
+      }
+
+      case 'laporan_bulanan': {
+        const rep = reportPeriod(rows, 'monthly', new Date());
+        const kenaikanPersen = rows.length ? Math.round(((rep.totalNet || 0) / Math.max(1, rep.totalNet - 0)) * 100) : 0;
+        const narrative = `Laporan Bulanan\nPeriode: ${rep.start.toLocaleDateString('id-ID')} - ${rep.end.toLocaleDateString('id-ID')}\nMasuk: ${formatNumber(rep.masuk)}\nKeluar: ${formatNumber(rep.keluar)}\nMati: ${formatNumber(rep.mati)}\nNet: ${formatNumber(rep.totalNet)}`;
+        createBubble(narrative, 'bot');
+        showModal('Detail Laporan Bulanan', `<pre>${escapeHtml(narrative)}</pre>`);
+        break;
+      }
+
+      case 'realisasi_masuk': {
+        const total = rows.reduce((s,r)=>s + r.Masuk, 0);
+        // top types by Masuk
+        const perType = groupBy(rows, r => r.Bibit);
+        const typeSummary = Object.entries(perType).map(([k,v]) => ({ jenis:k, masuk: v.reduce((a,b)=>a+b.Masuk,0) })).sort((a,b)=>b.masuk - a.masuk);
+        const jenis1 = typeSummary[0]?.jenis || 'N/A'; const jumlah1 = typeSummary[0]?.masuk || 0;
+        const jenis2 = typeSummary[1]?.jenis || 'N/A'; const jumlah2 = typeSummary[1]?.masuk || 0;
+        const kontribusi1 = total ? Math.round(jumlah1 / total * 100) : 0;
+        const kontribusi2 = total ? Math.round(jumlah2 / total * 100) : 0;
+        const summary = { total, jenis1, jenis2, kontribusi1, kontribusi2 };
+        const narasi = generateNarrative('realisasi_masuk', summary);
+        createBubble(narasi, 'bot');
+        createBubble('Analisis tambahan: tren penambahan dicatat, pantau mortalitas untuk menjaga efisiensi produksi.', 'bot');
+        break;
+      }
+
+      case 'realisasi_keluar': {
+        const total = rows.reduce((s,r)=>s + r.Keluar, 0);
+        const perType = groupBy(rows, r => r.Bibit);
+        const typeSummary = Object.entries(perType).map(([k,v]) => ({ jenis:k, keluar: v.reduce((a,b)=>a+b.Keluar,0) })).sort((a,b)=>b.keluar - a.keluar);
+        const jenisDominan = typeSummary[0]?.jenis || 'N/A';
+        // find date with highest keluar
+        const byDate = groupBy(rows.filter(r=>r.Tanggal), r => r.Tanggal.toISOString().slice(0,10));
+        const dateSummary = Object.entries(byDate).map(([d,items])=>({ date:d, keluar: items.reduce((s,i)=>s+i.Keluar,0) })).sort((a,b)=>b.keluar - a.keluar);
+        const tanggalPuncak = dateSummary[0]?.date ? new Date(dateSummary[0].date).toLocaleDateString('id-ID') : null;
+        const weeklyTotal = (() => {
+          const now = new Date();
+          const weekStart = new Date(now); weekStart.setDate(now.getDate()-6);
+          return rows.filter(r=>r.Tanggal && r.Tanggal>=weekStart).reduce((s,r)=>s+r.Keluar,0);
+        })();
+        const proporsiKeluar = weeklyTotal ? Math.round((dateSummary[0]?.keluar || 0) / Math.max(1, weeklyTotal) * 100) : 0;
+        // top tujuan
+        const tujuanSummary = Object.entries(groupBy(rows, r=>r.Tujuan)).map(([t,items]) => ({ tujuan:t || 'Tidak ditentukan', count: items.reduce((s,i)=>s+i.Keluar,0) })).sort((a,b)=>b.count - a.count);
+        const lokasiUtama = tujuanSummary[0]?.tujuan || '';
+        const summary = { total, jenisDominan, tanggalPuncak, proporsiKeluar, lokasiUtama };
+        const narasi = generateNarrative('realisasi_keluar', summary);
+        createBubble(narasi, 'bot');
+        createBubble('Analisis tambahan: berdasarkan 30 hari terakhir, rasio keluar-masuk mendekati stabilitas target. Rekomendasi buffer stok dan pengecekan permintaan lapangan.', 'bot');
+        break;
+      }
+
+      case 'analisis_stok': {
+        const stok = analysisStockPerType(rows);
+        const summary = {
+          top1: stok[0]?.jenis || '-',
+          top1stok: stok[0]?.stok || 0,
+          top2: stok[1]?.jenis || '-',
+          top2stok: stok[1]?.stok || 0,
+          top3: stok[2]?.jenis || '-',
+          top3stok: stok[2]?.stok || 0,
+          low1: stok[stok.length-1]?.jenis || '-',
+          low1stok: stok[stok.length-1]?.stok || 0,
+          low2: stok[stok.length-2]?.jenis || '-',
+          low2stok: stok[stok.length-2]?.stok || 0
+        };
+        const narasi = generateNarrative('per_jenis', summary);
+        createBubble(narasi, 'bot');
+        const html = `<div><strong>Analisis Stok per Jenis</strong><div class="small">Urut berdasarkan stok akhir</div><table><thead><tr><th>Jenis</th><th>Masuk</th><th>Keluar</th><th>Mati</th><th>Stok</th></tr></thead><tbody>${stok.map(s=>`<tr><td>${escapeHtml(s.jenis)}</td><td>${formatNumber(s.masuk)}</td><td>${formatNumber(s.keluar)}</td><td>${formatNumber(s.mati)}</td><td>${formatNumber(s.stok)}</td></tr>`).join('')}</tbody></table></div>`;
+        showModal('Analisis Stok per Jenis', html);
+        break;
+      }
+
+      case 'analisis_tim': {
+        const perf = analysisTeamPerformance(rows);
+        const html = `<div><strong>Analisis Kinerja Tim</strong><div class="small">Urut berdasarkan efisiensi</div><table><thead><tr><th>Tim/Pengawas</th><th>Masuk</th><th>Mati</th><th>Efisiensi (%)</th></tr></thead><tbody>${perf.map(p=>`<tr><td>${escapeHtml(p.team)}</td><td>${formatNumber(p.masuk)}</td><td>${formatNumber(p.mati)}</td><td>${p.efficiency.toFixed(1)}</td></tr>`).join('')}</tbody></table></div>`;
+        const narrative = `Analisis kinerja tim: terdata ${perf.length} pengawas/kelompok. Perhatikan pengawas dengan mortalitas tinggi dan efisiensi rendah. Rekomendasi tinjauan prosedur perawatan bibit pada kelompok tersebut.`;
+        createBubble(narrative, 'bot');
+        showModal('Analisis Kinerja Tim', html);
+        break;
+      }
+
+      case 'internal_vs_eksternal': {
+        const summary = analysisInternalVsExternal(rows);
+        const narrative = generateNarrative('internal_vs_external', { summary });
+        createBubble(narrative, 'bot');
+        showModal('Internal vs Eksternal', `<pre>${escapeHtml(narrative)}</pre>`);
+        break;
+      }
+
+      case 'grafik_stok': {
+        const stok = analysisStockPerType(rows);
+        const labels = stok.map(s=>s.jenis);
+        const data = stok.map(s=>s.stok);
+        const chartHtml = `<div style="height:340px"><canvas id="chartStock"></canvas></div><div class="small" style="margin-top:8px">Grafik menampilkan stok akhir per jenis.</div>`;
+        showModal('Grafik Stok per Jenis', chartHtml);
+        setTimeout(()=> {
+          try { renderBarChart('chartStock', labels, data, 'Stok'); } catch(e){ console.error(e); }
+        }, 120);
+        createBubble('Grafik stok per jenis ditampilkan di jendela detail.', 'bot');
+        break;
+      }
+
+      case 'laporan_tanggal': {
+        createBubble('Masukkan perintah "laporan YYYY-MM-DD" untuk melihat laporan pada tanggal tertentu.', 'bot');
+        break;
+      }
+
+      case 'deteksi_anomali': {
+        const anomalies = detectAnomalies(rows);
+        const narrative = generateNarrative('anomalies', anomalies);
+        createBubble(narrative, 'bot');
+        showModal('Deteksi Anomali', `<pre>${escapeHtml(narrative)}</pre>`);
+        break;
+      }
+
+      case 'bantuan': {
+        const help = `Panduan singkat:
+- "laporan harian" — ringkasan hari ini
+- "laporan YYYY-MM-DD" — laporan per tanggal
+- "laporan mingguan/bulanan" — rekap periodik
+- "realisasi masuk/keluar" — total realisasi
+- "analisis stok" — stok per jenis (detail)
+- "analisis tim" — performa per pengawas
+- "grafik stok" — grafik interaktif stok per jenis
+- "stok [jenis]" — detail transaksi untuk jenis
+- "deteksi anomali" — cari peringatan mortalitas/perubahan drastis
+Gunakan tombol pintasan untuk akses cepat.`;
+        createBubble(help, 'bot');
+        break;
+      }
+
+      default:
+        createBubble('Perintah tidak dikenali.', 'bot');
+    }
+  }catch(err){
+    createBubble('Terjadi kesalahan saat mengambil data: ' + err.message, 'bot');
+  }
 }
 
-async function showDataByJenis(j){
-  const f=DATA.filter(x=>x.bibit===j);
-  if(!f.length)return botSay(`❌ Tidak ada data untuk ${j}`);
-  await botSay(`📋 Data untuk <b>${j}</b>:`);f.slice(0,5).forEach(r=>bubble(`📅 ${r.tanggal}<br>📥 ${r.masuk} | 📤 ${r.keluar} | ⚰️ ${r.mati}`,'bot'));
-  showMainMenu();
+/* ================= User typed commands ================= */
+async function processUserCommand(text){
+  const raw = await fetchData();
+  const rows = normalizeRows(raw);
+  const q = text.trim().toLowerCase();
+
+  const dateMatch = q.match(/laporan\s+(\d{4}-\d{2}-\d{2})/);
+  if(q === 'laporan harian' || q === 'laporan hari ini'){
+    const rep = reportDaily(rows, new Date());
+    createBubble(rep.narrative, 'bot');
+    return;
+  } else if(dateMatch){
+    const dStr = dateMatch[1];
+    const d = new Date(dStr);
+    if(isNaN(d)) { createBubble('Format tanggal tidak valid. Gunakan YYYY-MM-DD.', 'bot'); return; }
+    const rep = reportDaily(rows, d);
+    createBubble(rep.narrative, 'bot');
+    const html = `<div><strong>Transaksi ${d.toLocaleDateString('id-ID')}</strong><table><thead><tr><th>Tanggal</th><th>Jenis</th><th>Masuk</th><th>Keluar</th><th>Mati</th></tr></thead><tbody>${rep.data.map(r=>`<tr><td>${escapeHtml(r.TanggalRaw || '')}</td><td>${escapeHtml(r.Bibit)}</td><td>${formatNumber(r.Masuk)}</td><td>${formatNumber(r.Keluar)}</td><td>${formatNumber(r.Mati)}</td></tr>`).join('')}</tbody></table></div>`;
+    showModal('Detail Laporan per Tanggal', html);
+    return;
+  }
+
+  if(q.includes('realisasi masuk')){
+    const total = rows.reduce((s,r)=>s + r.Masuk, 0);
+    createBubble('Total realisasi masuk: ' + formatNumber(total), 'bot');
+    return;
+  }
+  if(q.includes('realisasi keluar')){
+    const total = rows.reduce((s,r)=>s + r.Keluar, 0);
+    createBubble('Total realisasi keluar: ' + formatNumber(total), 'bot');
+    return;
+  }
+
+  const stokMatch = q.match(/^stok\s+(.+)$/);
+  if(stokMatch){
+    const jenis = stokMatch[1].trim().toLowerCase();
+    const filtered = rows.filter(r => (r.Bibit || '').toLowerCase() === jenis);
+    if(!filtered.length){ createBubble('Jenis tidak ditemukan: ' + jenis, 'bot'); return; }
+    const masuk = filtered.reduce((s,r)=>s + r.Masuk, 0);
+    const keluar = filtered.reduce((s,r)=>s + r.Keluar, 0);
+    const mati = filtered.reduce((s,r)=>s + r.Mati, 0);
+    const stok = masuk - keluar - mati;
+    const narrative = `Stok jenis ${jenis}:\nMasuk: ${formatNumber(masuk)}\nKeluar: ${formatNumber(keluar)}\nMati: ${formatNumber(mati)}\nStok akhir: ${formatNumber(stok)}`;
+    createBubble(narrative, 'bot');
+    const html = `<div><strong>Transaksi ${escapeHtml(jenis)}</strong><table><thead><tr><th>Tanggal</th><th>Masuk</th><th>Keluar</th><th>Mati</th></tr></thead><tbody>${filtered.map(r=>`<tr><td>${escapeHtml(r.TanggalRaw)}</td><td>${formatNumber(r.Masuk)}</td><td>${formatNumber(r.Keluar)}</td><td>${formatNumber(r.Mati)}</td></tr>`).join('')}</tbody></table></div>`;
+    showModal('Detail Transaksi: ' + jenis, html);
+    return;
+  }
+
+  if(q.includes('analisis stok') || q.includes('analisis per jenis')){
+    const stok = analysisStockPerType(rows);
+    const narrative = `Analisis Stok: jumlah jenis tersedia ${stok.length}. Jenis utama: ${stok.slice(0,3).map(s=>s.jenis + ' (' + formatNumber(s.stok) + ')').join(', ')}.`;
+    createBubble(narrative, 'bot');
+    const html = `<div><strong>Analisis Stok per Jenis</strong><table><thead><tr><th>Jenis</th><th>Stok</th><th>Status</th></tr></thead><tbody>${stok.map(s=>`<tr><td>${escapeHtml(s.jenis)}</td><td>${formatNumber(s.stok)}</td><td>${s.stok<=0 ? 'Habis' : s.stok < 200 ? 'Menipis' : 'Aman'}</td></tr>`).join('')}</tbody></table></div>`;
+    showModal('Analisis Stok per Jenis', html);
+    return;
+  }
+
+  if(q.includes('analisis tim') || q.includes('kinerja tim')){
+    const perf = analysisTeamPerformance(rows);
+    const narrative = `Analisis kinerja: terdata ${perf.length} pengawas/kelompok. Rekomendasi: tinjau pengawas dengan mortalitas > 10%.`;
+    createBubble(narrative, 'bot');
+    const html = `<div><strong>Analisis Kinerja Tim</strong><table><thead><tr><th>Tim</th><th>Masuk</th><th>Mati</th><th>Nilai Kinerja (%)</th></tr></thead><tbody>${perf.map(p=>`<tr><td>${escapeHtml(p.team)}</td><td>${formatNumber(p.masuk)}</td><td>${formatNumber(p.mati)}</td><td>${p.efficiency.toFixed(1)}</td></tr>`).join('')}</tbody></table></div>`;
+    showModal('Analisis Kinerja Tim', html);
+    return;
+  }
+
+  if(q.includes('deteksi anomali') || q.includes('anomali')){
+    const anomalies = detectAnomalies(rows);
+    const narrative = generateNarrative('anomalies', anomalies);
+    createBubble(narrative, 'bot');
+    showModal('Deteksi Anomali', `<pre>${escapeHtml(narrative)}</pre>`);
+    return;
+  }
+
+  createBubble('Perintah tidak dikenali. Ketik "bantuan" untuk daftar perintah atau gunakan tombol pintasan di bawah.', 'bot');
 }
 
-async function showTanggal(){
-  await botSay("📅 Pilih tanggal untuk melihat data:");
-  const inputDate=document.createElement('input');
-  inputDate.type='date';
-  inputDate.onchange=()=>{const v=inputDate.value;if(v){bubble(v,'user');showDataByDate(v);inputDate.remove();}};
-  chat.appendChild(inputDate);scrollBottom();
+/* ================= Utilities ================= */
+function escapeHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ================= EVENT BINDINGS ================= */
+sendBtn.addEventListener('click', async ()=>{
+  const val = inputEl.value.trim();
+  if(!val) return;
+  createBubble(escapeHtml(val), 'user');
+  inputEl.value = '';
+  await processUserCommand(val);
+});
+inputEl.addEventListener('keydown', e => {
+  if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); sendBtn.click(); }
+});
+modalClose.addEventListener('click', closeModal);
+document.getElementById('btnMenu').addEventListener('click', ()=> {
+  const help = `Menu cepat tersedia. Gunakan tombol di layar untuk menjalankan perintah. Untuk laporan per tanggal ketik "laporan YYYY-MM-DD". Untuk analisis stok ketik "analisis stok" atau tekan tombol pintasan.`;
+  createBubble(help, 'bot');
+});
+
+/* ================= INITIALIZATION ================= */
+async function init(){
+  initShortcuts();
+  createBubble('Selamat datang. Saya Montana AI. Data akan dimuat dari server untuk analisis dan laporan. Untuk panduan singkat ketik "bantuan" atau gunakan menu cepat.', 'bot');
+  try{
+    await fetchData();
+    const rows = normalizeRows(CACHE.data);
+    const stokSummary = analysisStockPerType(rows);
+    const totalStok = stokSummary.reduce((a,b)=>a+b.stok,0);
+    const jenisCount = [...new Set(rows.map(r=>r.Bibit))].length;
+    createBubble(`Ringkasan awal: ${formatNumber(rows.length)} baris data, ${formatNumber(jenisCount)} jenis bibit, estimasi stok keseluruhan: ${formatNumber(totalStok)}.`, 'bot');
+    // Friendly closing suggestion (end-of-initial)
+    createBubble('Silakan pilih menu cepat atau ketik perintah. Laporan dan analisis diperbarui secara berkala dari sumber data utama.', 'bot');
+  }catch(err){
+    createBubble('Tidak dapat memuat data: ' + err.message, 'bot');
+  }
 }
 
-async function showDataByDate(v){
-  const d=new Date(v);d.setHours(0,0,0,0);
-  const f=DATA.filter(x=>x.__date.toDateString()===d.toDateString());
-  if(!f.length)return botSay(`❌ Tidak ada data pada <b>${v}</b>.`);
-  await botSay(`📋 Data tanggal <b>${v}</b>:`);f.forEach(r=>bubble(`🌱 ${r.bibit}<br>📥 ${r.masuk} | 📤 ${r.keluar} | ⚰️ ${r.mati}`,'bot'));
-  showMainMenu();
-}
-
-sendBtn.onclick=()=>{const v=input.value.trim();if(!v)return;bubble(v,'user');input.value='';botSay("Mohon gunakan tombol menu di bawah untuk interaksi. 🌿");showMainMenu();};
-input.addEventListener('keypress',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendBtn.click();}});
-loadData();
+init();
 </script>
 </body>
 </html>
