@@ -179,23 +179,59 @@ async function fetchData(limit = 0, force=false){
   }
 }
 
-function toNum(v){
-  if (v === null || v === undefined) return 0;
-  const s = String(v).replace(/[^\d\-.,]/g,'').replace(',', '.');
+/* Robust number parser: supports "1.250", "1,250", "1,250.50", "1.250,50" etc. */
+function toNum(v) {
+  if (v === null || v === undefined || v === '') return 0;
+  // If already number
+  if (typeof v === 'number' && !isNaN(v)) return v;
+  let s = String(v).trim();
+  // remove any non-digit, non-dot, non-comma, non-minus characters
+  s = s.replace(/[^\d\-,.]/g, '');
+  // If both comma and dot exist, assume last separator is decimal
+  const lastComma = s.lastIndexOf(',');
+  const lastDot = s.lastIndexOf('.');
+  if (lastComma > -1 && lastDot > -1) {
+    if (lastComma > lastDot) {
+      // treat comma as decimal, remove dots as thousand separators
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else {
+      // dot is decimal, remove commas
+      s = s.replace(/,/g, '');
+    }
+  } else if (lastComma > -1 && lastDot === -1) {
+    // only comma present -> treat comma as decimal if there are <=2 digits after comma, else as thousands
+    const parts = s.split(',');
+    if (parts[1] && parts[1].length <= 2) {
+      s = s.replace(',', '.');
+    } else {
+      s = s.replace(/,/g, '');
+    }
+  } else {
+    // only dot present or none -> remove commas just in case
+    s = s.replace(/,/g, '');
+  }
   const n = parseFloat(s);
   return isNaN(n) ? 0 : n;
 }
+
 function parseDateFlexible(s){
   if(!s) return null;
-  const tryDate = new Date(String(s));
-  if(!isNaN(tryDate)) return tryDate;
-  const m = String(s).match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (s instanceof Date && !isNaN(s)) return s;
+  const str = String(s).trim();
+  // Try ISO / standard parse
+  const iso = Date.parse(str);
+  if(!isNaN(iso)) return new Date(iso);
+  // Try dd/mm/yyyy or dd-mm-yyyy
+  const m = str.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
   if(m){ return new Date(parseInt(m[3],10), parseInt(m[2],10)-1, parseInt(m[1],10)); }
+  // Try mm/dd/yyyy fallback
+  const m2 = str.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+  if(m2){ return new Date(m2[3].length===2?('20'+m2[3]):m2[3], parseInt(m2[1],10)-1, parseInt(m2[2],10)); }
   return null;
 }
 
 function normalizeRows(raw){
-  return raw.map((r, idx) => {
+  return (raw || []).map((r, idx) => {
     const mapKey = key => {
       if(!r) return '';
       const keys = Object.keys(r);
@@ -205,7 +241,8 @@ function normalizeRows(raw){
       return alt ? r[alt] : '';
     };
     const tanggalRaw = r.Tanggal ?? r.tanggal ?? r.Date ?? r.date ?? mapKey('tanggal') ?? '';
-    const bibit = r.Bibit ?? r.bibit ?? r.Jenis ?? r.jenis ?? mapKey('bibit') ?? 'Unknown';
+    const bibitRaw = r.Bibit ?? r.bibit ?? r.Jenis ?? r.jenis ?? mapKey('bibit') ?? 'Unknown';
+    const bibit = String(bibitRaw).trim().toUpperCase();
     const masuk = toNum(r.Masuk ?? r.masuk ?? r['Jumlah Masuk'] ?? r['jumlah masuk'] ?? mapKey('masuk'));
     const keluar = toNum(r.Keluar ?? r.keluar ?? r['Jumlah Keluar'] ?? mapKey('keluar'));
     const mati = toNum(r.Mati ?? r.mati ?? r['Jumlah Mati'] ?? mapKey('mati'));
@@ -218,7 +255,7 @@ function normalizeRows(raw){
       __raw: r,
       TanggalRaw: tanggalRaw,
       Tanggal: parsedDate,
-      Bibit: String(bibit).trim(),
+      Bibit: bibit,
       Masuk: masuk,
       Keluar: keluar,
       Mati: mati,
@@ -237,30 +274,54 @@ function groupBy(arr, keyFn){
     return acc;
   }, {});
 }
-function formatNumber(n){ return n.toLocaleString('id-ID'); }
+function formatNumber(n){ return Number(n || 0).toLocaleString('id-ID'); }
 
 /* ================= Reports & Analysis ================= */
-function reportDaily(rows, date = new Date()){
-  const dayStr = date.toISOString().slice(0,10);
-  const filt = rows.filter(r => r.Tanggal && r.Tanggal.toISOString().slice(0,10) === dayStr);
-  const masuk = filt.reduce((s,r)=>s + r.Masuk, 0);
-  const keluar = filt.reduce((s,r)=>s + r.Keluar, 0);
-  const mati = filt.reduce((s,r)=>s + r.Mati, 0);
+function reportDaily(rows, date = new Date()) {
+  // Ambil hanya tanggal (tanpa jam)
+  const targetDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  
+  // Filter baris yang tanggalnya sama (dengan toleransi format)
+  const filt = rows.filter(r => {
+    if (!r.Tanggal) return false;
+    const rowDate = new Date(r.Tanggal.getFullYear(), r.Tanggal.getMonth(), r.Tanggal.getDate());
+    return rowDate.getTime() === targetDate.getTime();
+  });
+
+  // Hitung agregat
+  const masuk = filt.reduce((s, r) => s + (r.Masuk || 0), 0);
+  const keluar = filt.reduce((s, r) => s + (r.Keluar || 0), 0);
+  const mati = filt.reduce((s, r) => s + (r.Mati || 0), 0);
   const totalNet = masuk - keluar - mati;
-  const byType = groupBy(filt, r => r.Bibit);
-  const rekap = Object.entries(byType).map(([k,v]) => ({ jenis:k, total: v.reduce((s,x)=>s + x.Masuk - x.Keluar - x.Mati, 0) }))
-    .sort((a,b)=>b.total - a.total);
-  const top = rekap.slice(0,5);
-  let narrative = `Ringkasan Harian — ${date.toLocaleDateString('id-ID')}\n\n`;
-  narrative += `Total masuk: ${formatNumber(masuk)}\n`;
-  narrative += `Total keluar: ${formatNumber(keluar)}\n`;
-  narrative += `Total mati: ${formatNumber(mati)}\n`;
-  narrative += `Total net (masuk - keluar - mati): ${formatNumber(totalNet)}\n\n`;
-  narrative += `Jenis dominan hari ini:\n`;
-  if(top.length) top.forEach(t => narrative += `- ${t.jenis}: ${formatNumber(t.total)}\n`);
-  else narrative += '- Tidak ada transaksi hari ini.\n';
-  return { narrative, data: filt, metrics:{masuk,keluar,mati,totalNet}, top };
+
+  // Rekap per jenis bibit
+  const byType = groupBy(filt, r => r.Bibit || 'Unknown');
+  const rekap = Object.entries(byType)
+    .map(([k, v]) => ({
+      jenis: k,
+      total: v.reduce((s, x) => s + x.Masuk - x.Keluar - x.Mati, 0)
+    }))
+    .sort((a, b) => b.total - a.total);
+
+  // Bangun narasi analisis
+  let narrative = `📅 *Laporan Harian Pembibitan* — ${targetDate.toLocaleDateString('id-ID')}\n\n`;
+  narrative += `Total Masuk : ${formatNumber(masuk)} bibit\n`;
+  narrative += `Total Keluar : ${formatNumber(keluar)} bibit\n`;
+  narrative += `Total Mati : ${formatNumber(mati)} bibit\n`;
+  narrative += `Saldo Bersih : ${formatNumber(totalNet)} bibit\n\n`;
+
+  if (rekap.length) {
+    narrative += `📊 *Rangkuman per Jenis Bibit:*\n`;
+    rekap.slice(0, 10).forEach(t => {
+      narrative += `• ${t.jenis}: ${formatNumber(t.total)}\n`;
+    });
+  } else {
+    narrative += `⚠️ Tidak ada aktivitas pembibitan pada tanggal ini.`;
+  }
+
+  return { narrative, data: filt, metrics: { masuk, keluar, mati, totalNet }, rekap };
 }
+
 
 function reportPeriod(rows, period='weekly', refDate=new Date()){
   const end = new Date(refDate);
@@ -276,16 +337,41 @@ function reportPeriod(rows, period='weekly', refDate=new Date()){
   return { period, start, end, masuk, keluar, mati, totalNet, rows:filt };
 }
 
-function analysisStockPerType(rows){
-  const grouped = groupBy(rows, r => r.Bibit || 'Unknown');
+/* ================= UPDATED: analysisStockPerType (SAFE) ================= */
+function analysisStockPerType(rows) {
+  const grouped = groupBy(rows, r => String(r.Bibit || 'Unknown').trim().toUpperCase());
+
   const result = Object.entries(grouped).map(([jenis, items]) => {
-    const masuk = items.reduce((s,i)=>s + i.Masuk, 0);
-    const keluar = items.reduce((s,i)=>s + i.Keluar, 0);
-    const mati = items.reduce((s,i)=>s + i.Mati, 0);
-    const stok = masuk - keluar - mati;
+    const masuk = items.reduce((s, i) => s + Math.max(0, toNum(i.Masuk)), 0);
+    const keluar = items.reduce((s, i) => s + Math.max(0, toNum(i.Keluar)), 0);
+    const mati = items.reduce((s, i) => s + Math.max(0, toNum(i.Mati)), 0);
+
+    // Logika total akumulatif
+    let stok = masuk - keluar - mati;
+
+    // Cegah nilai minus atau NaN
+    if (isNaN(stok) || stok < 0) stok = 0;
+
     return { jenis, masuk, keluar, mati, stok };
-  }).sort((a,b)=>b.stok - a.stok);
+  }).sort((a, b) => b.stok - a.stok);
+
   return result;
+}
+
+
+/* Detect negative stocks or suspicious items and notify user via chat bubble */
+function detectNegativeStocks(result){
+  if(!Array.isArray(result)) return;
+  // find items where raw calculation would produce negative (we only kept 0 above),
+  // so detect by checking if (masuk - keluar - mati) < 0 before we clamped
+  const negatives = result.filter(x => {
+    const raw = (x.masuk || 0) - (x.keluar || 0) - (x.mati || 0);
+    return raw < 0;
+  });
+  if(negatives.length){
+    const msg = negatives.map(x => `• ${x.jenis}: raw (${(x.masuk||0).toLocaleString('id-ID')} - ${(x.keluar||0).toLocaleString('id-ID')} - ${(x.mati||0).toLocaleString('id-ID')}) = ${( (x.masuk||0) - (x.keluar||0) - (x.mati||0) )}`).join('\n');
+    createBubble(`⚠️ *Peringatan Konsistensi Data*\nSistem mendeteksi beberapa jenis memiliki perhitungan stok negatif saat mengolah data periode terpilih:\n\n${msg}\n\nKemungkinan penyebab: data lama masih terhitung, baris rekap/total ikut terbaca, atau nilai 'Keluar'/'Mati' lebih besar dari 'Masuk'. Silakan periksa sheet dan periode data.`, 'bot');
+  }
 }
 
 function analysisTeamPerformance(rows){
@@ -357,6 +443,7 @@ function renderLineChart(containerId, labels, datasets){
 }
 
 /* ============ Narasi Analisis Otomatis ============ */
+/* (keep generateNarrative as-is from original) */
 function generateNarrative(type, d) {
   if(!d) d = {};
   switch(type) {
@@ -563,7 +650,9 @@ async function handleShortcut(id){
       }
 
       case 'analisis_stok': {
-        const stok = analysisStockPerType(rows);
+        // default 90 hari; you can adjust by calling analysisStockPerType(rows, 30) etc
+        const stok = analysisStockPerType(rows, 90);
+        detectNegativeStocks(stok); // alert if any raw negative
         const summary = {
           top1: stok[0]?.jenis || '-',
           top1stok: stok[0]?.stok || 0,
@@ -578,7 +667,7 @@ async function handleShortcut(id){
         };
         const narasi = generateNarrative('per_jenis', summary);
         createBubble(narasi, 'bot');
-        const html = `<div><strong>Analisis Stok per Jenis</strong><div class="small">Urut berdasarkan stok akhir</div><table><thead><tr><th>Jenis</th><th>Masuk</th><th>Keluar</th><th>Mati</th><th>Stok</th></tr></thead><tbody>${stok.map(s=>`<tr><td>${escapeHtml(s.jenis)}</td><td>${formatNumber(s.masuk)}</td><td>${formatNumber(s.keluar)}</td><td>${formatNumber(s.mati)}</td><td>${formatNumber(s.stok)}</td></tr>`).join('')}</tbody></table></div>`;
+        const html = `<div><strong>Analisis Stok per Jenis (90 hari terakhir)</strong><div class="small">Urut berdasarkan stok akhir</div><table><thead><tr><th>Jenis</th><th>Masuk</th><th>Keluar</th><th>Mati</th><th>Stok</th></tr></thead><tbody>${stok.map(s=>`<tr><td>${escapeHtml(s.jenis)}</td><td>${formatNumber(s.masuk)}</td><td>${formatNumber(s.keluar)}</td><td>${formatNumber(s.mati)}</td><td>${formatNumber(s.stok)}</td></tr>`).join('')}</tbody></table></div>`;
         showModal('Analisis Stok per Jenis', html);
         break;
       }
@@ -601,10 +690,11 @@ async function handleShortcut(id){
       }
 
       case 'grafik_stok': {
-        const stok = analysisStockPerType(rows);
+        const stok = analysisStockPerType(rows, 90);
+        detectNegativeStocks(stok);
         const labels = stok.map(s=>s.jenis);
         const data = stok.map(s=>s.stok);
-        const chartHtml = `<div style="height:340px"><canvas id="chartStock"></canvas></div><div class="small" style="margin-top:8px">Grafik menampilkan stok akhir per jenis.</div>`;
+        const chartHtml = `<div style="height:340px"><canvas id="chartStock"></canvas></div><div class="small" style="margin-top:8px">Grafik menampilkan stok akhir per jenis (90 hari terakhir).</div>`;
         showModal('Grafik Stok per Jenis', chartHtml);
         setTimeout(()=> {
           try { renderBarChart('chartStock', labels, data, 'Stok'); } catch(e){ console.error(e); }
@@ -655,6 +745,38 @@ async function processUserCommand(text){
   const raw = await fetchData();
   const rows = normalizeRows(raw);
   const q = text.trim().toLowerCase();
+    // === Deteksi input hanya berupa tanggal ===
+  const dateOnly = text.trim().match(/^\d{4}-\d{2}-\d{2}$/);
+  if (dateOnly) {
+    const d = new Date(dateOnly[0]);
+    if (isNaN(d)) {
+      createBubble('Format tanggal tidak valid. Gunakan format YYYY-MM-DD.', 'bot');
+      return;
+    }
+    const rep = reportDaily(rows, d);
+    createBubble(`📅 Laporan Otomatis Berdasarkan Input Tanggal\n${rep.narrative}`, 'bot');
+    const html = `
+      <div>
+        <strong>Transaksi ${d.toLocaleDateString('id-ID')}</strong>
+        <table>
+          <thead>
+            <tr><th>Tanggal</th><th>Jenis</th><th>Masuk</th><th>Keluar</th><th>Mati</th></tr>
+          </thead>
+          <tbody>
+            ${rep.data.map(r => `
+              <tr>
+                <td>${escapeHtml(r.TanggalRaw || '')}</td>
+                <td>${escapeHtml(r.Bibit)}</td>
+                <td>${formatNumber(r.Masuk)}</td>
+                <td>${formatNumber(r.Keluar)}</td>
+                <td>${formatNumber(r.Mati)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    showModal('Detail Laporan per Tanggal', html);
+    return;
+  }
 
   const dateMatch = q.match(/laporan\s+(\d{4}-\d{2}-\d{2})/);
   if(q === 'laporan harian' || q === 'laporan hari ini'){
@@ -685,22 +807,23 @@ async function processUserCommand(text){
 
   const stokMatch = q.match(/^stok\s+(.+)$/);
   if(stokMatch){
-    const jenis = stokMatch[1].trim().toLowerCase();
-    const filtered = rows.filter(r => (r.Bibit || '').toLowerCase() === jenis);
-    if(!filtered.length){ createBubble('Jenis tidak ditemukan: ' + jenis, 'bot'); return; }
+    const jenisQuery = stokMatch[1].trim().toUpperCase();
+    const filtered = rows.filter(r => (r.Bibit || '').toUpperCase() === jenisQuery);
+    if(!filtered.length){ createBubble('Jenis tidak ditemukan: ' + jenisQuery, 'bot'); return; }
     const masuk = filtered.reduce((s,r)=>s + r.Masuk, 0);
     const keluar = filtered.reduce((s,r)=>s + r.Keluar, 0);
     const mati = filtered.reduce((s,r)=>s + r.Mati, 0);
-    const stok = masuk - keluar - mati;
-    const narrative = `Stok jenis ${jenis}:\nMasuk: ${formatNumber(masuk)}\nKeluar: ${formatNumber(keluar)}\nMati: ${formatNumber(mati)}\nStok akhir: ${formatNumber(stok)}`;
+    const stok = Math.max(0, masuk - keluar - mati);
+    const narrative = `Stok jenis ${jenisQuery}:\nMasuk: ${formatNumber(masuk)}\nKeluar: ${formatNumber(keluar)}\nMati: ${formatNumber(mati)}\nStok akhir: ${formatNumber(stok)}`;
     createBubble(narrative, 'bot');
-    const html = `<div><strong>Transaksi ${escapeHtml(jenis)}</strong><table><thead><tr><th>Tanggal</th><th>Masuk</th><th>Keluar</th><th>Mati</th></tr></thead><tbody>${filtered.map(r=>`<tr><td>${escapeHtml(r.TanggalRaw)}</td><td>${formatNumber(r.Masuk)}</td><td>${formatNumber(r.Keluar)}</td><td>${formatNumber(r.Mati)}</td></tr>`).join('')}</tbody></table></div>`;
-    showModal('Detail Transaksi: ' + jenis, html);
+    const html = `<div><strong>Transaksi ${escapeHtml(jenisQuery)}</strong><table><thead><tr><th>Tanggal</th><th>Masuk</th><th>Keluar</th><th>Mati</th></tr></thead><tbody>${filtered.map(r=>`<tr><td>${escapeHtml(r.TanggalRaw)}</td><td>${formatNumber(r.Masuk)}</td><td>${formatNumber(r.Keluar)}</td><td>${formatNumber(r.Mati)}</td></tr>`).join('')}</tbody></table></div>`;
+    showModal('Detail Transaksi: ' + jenisQuery, html);
     return;
   }
 
   if(q.includes('analisis stok') || q.includes('analisis per jenis')){
-    const stok = analysisStockPerType(rows);
+    const stok = analysisStockPerType(rows, 90);
+    detectNegativeStocks(stok);
     const narrative = `Analisis Stok: jumlah jenis tersedia ${stok.length}. Jenis utama: ${stok.slice(0,3).map(s=>s.jenis + ' (' + formatNumber(s.stok) + ')').join(', ')}.`;
     createBubble(narrative, 'bot');
     const html = `<div><strong>Analisis Stok per Jenis</strong><table><thead><tr><th>Jenis</th><th>Stok</th><th>Status</th></tr></thead><tbody>${stok.map(s=>`<tr><td>${escapeHtml(s.jenis)}</td><td>${formatNumber(s.stok)}</td><td>${s.stok<=0 ? 'Habis' : s.stok < 200 ? 'Menipis' : 'Aman'}</td></tr>`).join('')}</tbody></table></div>`;
@@ -755,10 +878,11 @@ async function init(){
   try{
     await fetchData();
     const rows = normalizeRows(CACHE.data);
-    const stokSummary = analysisStockPerType(rows);
+    const stokSummary = analysisStockPerType(rows, 90);
+    detectNegativeStocks(stokSummary);
     const totalStok = stokSummary.reduce((a,b)=>a+b.stok,0);
     const jenisCount = [...new Set(rows.map(r=>r.Bibit))].length;
-    createBubble(`Ringkasan awal: ${formatNumber(rows.length)} baris data, ${formatNumber(jenisCount)} jenis bibit, estimasi stok keseluruhan: ${formatNumber(totalStok)}.`, 'bot');
+    createBubble(`Ringkasan awal: ${formatNumber(rows.length)} baris data, ${formatNumber(jenisCount)} jenis bibit, estimasi stok keseluruhan (90d): ${formatNumber(totalStok)}.`, 'bot');
     // Friendly closing suggestion (end-of-initial)
     createBubble('Silakan pilih menu cepat atau ketik perintah. Laporan dan analisis diperbarui secara berkala dari sumber data utama.', 'bot');
   }catch(err){
@@ -770,4 +894,3 @@ init();
 </script>
 </body>
 </html>
-
